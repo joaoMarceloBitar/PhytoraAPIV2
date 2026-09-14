@@ -1,0 +1,21 @@
+node_modules/
+npm-debug.log*
+
+.venv/
+venv/
+ENV/
+pyvenv.cfg
+
+__MACOSX/
+.DS_Store
+Thumbs.db
+
+.env
+.env.local
+
+# Artefatos de runtime (worker Python gerado, uploads temporários)
+.runtime/
+
+# Configs locais do Claude Code (mantém só as skills versionadas)
+.claude/*
+!.claude/skills
