@@ -56,16 +56,26 @@ Isso exige, pela primeira vez neste projeto: contas de usuário, um banco de dad
 - Reestruturação em camadas:
   ```
   src/
+    server.ts        (bootstrap: valida modelo, sobe worker, sobe HTTP)
+    app.ts           (montagem do Express)
+    config/          (env e caminhos)
     db/
       knexfile.ts
       migrations/    (uma por entidade/alteração de schema)
       seeds/         (01_culturas.ts, 02_doencas.ts, 03_estacoes_inmet.ts)
     routes/
     controllers/
-    services/        (regra de negócio, sem contato com o DB)
-    repositories/     (query via Knex, único ponto de contato com o DB)
+    services/        (regra de negócio, sem contato com DB nem I/O externo)
+    repositories/    (query via Knex, único ponto de contato com o DB)
+    infra/           (adaptadores externos: worker Python, cliente INMET, storage de fotos)
+    middlewares/     (upload, autenticação, tratamento de erros)
     dtos/            (schemas Zod + tipos inferidos, Input/Output por recurso)
+    types/           (tipos de domínio)
   ```
+
+  > A camada `infra/` foi acrescentada durante a etapa 0: o worker Python (e, mais adiante,
+  > o cliente do INMET e o storage de fotos) é I/O externo — não é regra de negócio
+  > (`services/`) nem acesso a banco (`repositories/`), então precisava de um lugar próprio.
 - Execução via `tsx` no dia a dia (`npm run dev`), com script de build (`tsc`) separado
 - Middleware de autenticação (verifica JWT, injeta usuário autenticado no `request`)
 - Serviço de storage de fotos abstraído; implementação inicial = disco local + rota estática `/uploads`
@@ -129,7 +139,7 @@ Sem mudanças de arquitetura nesta atualização — mantém a CNN atual (4 doen
 
 Cada etapa é testável isoladamente antes de seguir para a próxima:
 
-0. Reestruturar `PhytoraAPI` em camadas + migrar para TypeScript (preservando `/infer` intacto, validado por smoke test manual)
+0. ✅ **Concluída** — Reestruturar `PhytoraAPI` em camadas + migrar para TypeScript (preservando `/infer` intacto, validado por smoke test manual)
 1. Configurar Postgres+PostGIS via Docker Compose + Knex (migrations de todas as entidades, seeds de culturas/doenças/estações INMET)
 2. Sistema de contas e autenticação (cadastro, login, refresh rotativo, middleware de auth) + DTOs Zod
 3. Migrar o app mobile de Expo Go para dev client (habilita os passos seguintes)

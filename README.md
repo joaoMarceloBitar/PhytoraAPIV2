@@ -1,42 +1,42 @@
-# API de Inferência CNN com Node.js + PyTorch
+# Phytora API
 
-Esta API recebe uma imagem, executa a inferência em um modelo CNN treinado no PyTorch e retorna a classe prevista pelo modelo.
+API de inferência de fitopatologias: recebe uma imagem de folha, executa a inferência em um modelo CNN treinado no PyTorch e retorna a classe prevista.
 
-A API foi construída em Node.js, mas a inferência é executada com PyTorch em Python, pois o modelo salvo está no formato `.pth`.
+A API é escrita em **TypeScript/Node.js**, mas a inferência roda em **Python/PyTorch**, já que o modelo treinado está no formato `.pth`. O processo Python fica vivo entre requisições (carregar o modelo é caro) e se comunica com o Node por stdin/stdout, um JSON por linha.
 
 ---
 
-## Estrutura esperada do projeto
+## Estrutura
 
 ```txt
-cnn-node-api/
-├── server.js
-├── package.json
-├── requirements.txt
-└── models_saved/
-    └── model.pth
+PhytoraAPI/
+├── src/
+│   ├── server.ts                       # bootstrap: valida modelo, sobe worker, sobe HTTP
+│   ├── app.ts                          # montagem do Express (middlewares + rotas)
+│   ├── config/env.ts                   # variáveis de ambiente e caminhos
+│   ├── routes/                         # definição das rotas
+│   ├── controllers/                    # entrada/saída HTTP, chama services
+│   ├── services/                       # regra de negócio (sem acesso a DB ou I/O externo)
+│   ├── repositories/                   # acesso ao banco de dados (a partir da etapa 1)
+│   ├── infra/                          # adaptadores externos (worker Python, INMET, storage)
+│   ├── middlewares/                    # upload (multer) e tratamento de erros
+│   └── types/                          # tipos do domínio
+├── python/
+│   └── inference_worker.py             # worker de inferência (PyTorch)
+├── models_saved/
+│   └── model.pth                       # checkpoint treinado
+└── .runtime/uploads/                   # imagens temporárias (apagadas após a inferência)
 ```
 
 ---
 
-## 1. Instalar dependências do Node.js
-
-Dentro da pasta do projeto, execute:
+## 1. Instalar dependências do Node
 
 ```bash
 npm install
 ```
 
----
-
-## 2. Criar ambiente Python
-
-### Linux/macOS
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
+## 2. Criar o ambiente Python
 
 ### Windows PowerShell
 
@@ -45,171 +45,97 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
----
+### Linux/macOS
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
 
 ## 3. Instalar dependências Python
-
-Com o ambiente Python ativado, execute:
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
-
-## 4. Copiar o modelo treinado
-
-Após treinar sua CNN, você terá um arquivo `.pth`, por exemplo:
-
-```txt
-model_20260522_103012.pth
-```
-
-Copie esse arquivo para a pasta:
-
-```txt
-models_saved/
-```
-
-E renomeie obrigatoriamente para:
-
-```txt
-model.pth
-```
-
-O caminho final deve ficar assim:
-
-```txt
-models_saved/model.pth
-```
-
-Atenção: se o arquivo `models_saved/model.pth` não existir, a API não inicia.
-
----
-
-## 5. Rodar a API
-
-Execute:
+## 4. Configurar variáveis de ambiente
 
 ```bash
-npm start
+cp .env.example .env
 ```
 
-Se tudo estiver correto, a API irá carregar o modelo `.pth` e ficará aguardando requisições.
+Se o venv não estiver ativado no shell que roda a API, aponte o `PYTHON_CMD` para o interpretador do venv (ex.: `./.venv/Scripts/python.exe` no Windows).
 
-Exemplo de saída esperada:
+## 5. Colocar o modelo treinado
+
+O checkpoint precisa estar em `models_saved/model.pth` — se o arquivo não existir, a API não inicia.
+
+## 6. Rodar
+
+```bash
+npm run dev     # desenvolvimento (tsx, recarrega ao salvar)
+npm start       # compila (tsc) e roda a partir de dist/
+npm run typecheck
+```
+
+Saída esperada:
 
 ```txt
 Inicializando API de inferência CNN...
-Modelo esperado em: models_saved/model.pth
+Modelo esperado em: .../models_saved/model.pth
 
 API iniciada com modelo carregado.
-Servidor rodando em: http://localhost:3000
-Endpoint de inferência: POST http://localhost:3000/infer
+Dispositivo usado pelo PyTorch: cpu
+Classes carregadas: ["ferrugem","mancha_alvo","mosaico","saudavel","septoria"]
+
+Servidor rodando em: http://localhost:3080
+Endpoint de inferência: POST http://localhost:3080/infer
 ```
 
 ---
 
-## 6. Endpoint disponível
-
-A API possui apenas um endpoint:
+## Endpoint
 
 ```txt
 POST /infer
 ```
 
-Esse endpoint recebe uma imagem no formato `multipart/form-data`.
+Recebe `multipart/form-data` com a imagem no campo `image` (JPEG, PNG, WEBP ou BMP, até 8 MB).
 
-O nome do campo da imagem deve ser:
-
-```txt
-image
-```
-
----
-
-## 7. Testar com curl
-
-Coloque uma imagem de teste na pasta do projeto, por exemplo (teste.jpg, teste.png, qualquer outro):
-
-```txt
-teste.jpg
-```
-
-Depois execute em outro terminal em sua máquina:
+### Testar com curl
 
 ```bash
-curl -X POST http://localhost:3000/infer \
-  -F "image=@./teste.jpg"
+curl -X POST http://localhost:3080/infer -F "image=@./teste.jpg"
 ```
 
-No Windows PowerShell, use:
+No Windows PowerShell, use `curl.exe`.
 
-```powershell
-curl.exe -X POST http://localhost:3000/infer -F "image=@./teste.jpg"
-```
-
----
-
-## 8. Resposta esperada
-
-A API retorna um JSON com a classe prevista pelo modelo:
+### Resposta
 
 ```json
 {
   "ok": true,
-  "predictedClass": "cat",
-  "predictedIndex": 0,
-  "confidence": 0.9231,
+  "predictedClass": "septoria",
+  "predictedIndex": 4,
+  "confidence": 0.6351,
   "topPredictions": [
-    {
-      "class": "cat",
-      "index": 0,
-      "confidence": 0.9231
-    },
-    {
-      "class": "dog",
-      "index": 1,
-      "confidence": 0.0612
-    },
-    {
-      "class": "horse",
-      "index": 2,
-      "confidence": 0.0157
-    }
+    { "class": "septoria", "index": 4, "confidence": 0.6351 },
+    { "class": "ferrugem", "index": 0, "confidence": 0.3647 },
+    { "class": "mosaico", "index": 2, "confidence": 0.0000251 }
   ]
 }
 ```
 
 ---
 
-## 9. Observações importantes
+## Observações importantes
 
-A arquitetura da CNN usada na API precisa ser igual à arquitetura usada no treinamento.
+A arquitetura da CNN definida em `python/inference_worker.py` precisa ser **idêntica** à usada no treinamento do `.pth` — se você alterar a rede ao treinar, atualize a classe `CNN` nesse arquivo, senão o `load_state_dict` falha.
 
-Se você alterou a classe `CNN` durante o treinamento, também precisa atualizar a classe `CNN` dentro do arquivo `server.js`.
-
-O arquivo `.pth` deve ter sido salvo no formato utilizado no código da aula.
+Os nomes das classes vêm do próprio checkpoint (chave `classes`). Se o `.pth` não trouxer essa lista, a API responde com nomes genéricos (`classe_indice_N_sem_nome_no_checkpoint`).
 
 ---
 
-## 10. Checklist antes de rodar
+## Documentação do projeto
 
-Antes de executar `npm start`, confirme:
-
-- O Node.js está instalado.
-- O Python está instalado.
-- As dependências do Node foram instaladas com `npm install`.
-- As dependências Python foram instaladas com `pip install -r requirements.txt`.
-- A pasta `models_saved/` existe.
-- O modelo treinado foi copiado para `models_saved/model.pth`.
-- O nome do arquivo é exatamente `model.pth`.
-- A arquitetura da CNN na API é igual à arquitetura usada no treinamento.
-
----
-
-## Comando final para rodar
-
-```bash
-npm start
-```
+O histórico de versões e o plano da atualização em andamento estão em [`docs/`](./docs) — veja `docs/README.md`.

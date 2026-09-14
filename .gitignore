@@ -1,6 +1,9 @@
 node_modules/
 npm-debug.log*
 
+# Saída do build TypeScript
+dist/
+
 .venv/
 venv/
 ENV/
@@ -13,7 +16,7 @@ Thumbs.db
 .env
 .env.local
 
-# Artefatos de runtime (worker Python gerado, uploads temporários)
+# Artefatos de runtime (uploads temporários de imagens)
 .runtime/
 
 # Configs locais do Claude Code (mantém só as skills versionadas)
